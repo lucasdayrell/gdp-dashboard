@@ -3,149 +3,128 @@ import pandas as pd
 import math
 from pathlib import Path
 
-# Set the title and favicon that appear in the Browser's tab bar.
-st.set_page_config(
-    page_title='GDP dashboard',
-    page_icon=':earth_americas:', # This is an emoji shortcode. Could be a URL too.
-)
+import streamlit as st
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import r2_score, mean_squared_error
 
-# -----------------------------------------------------------------------------
-# Declare some useful functions.
+# Configuração inicial da aplicação
+st.set_page_config(page_title="NBA Data Analysis", layout="wide")
 
+# Função para carregar os dados
 @st.cache_data
-def get_gdp_data():
-    """Grab GDP data from a CSV file.
+def load_data(url):
+    data = pd.read_csv(url)
+    return data
 
-    This uses caching to avoid having to read the file every time. If we were
-    reading from an HTTP endpoint instead of a file, it's a good idea to set
-    a maximum age to the cache with the TTL argument: @st.cache_data(ttl='1d')
-    """
+# Título da aplicação
+st.title("NBA Data Analysis - Exploratory Data and Regression")
 
-    # Instead of a CSV on disk, you could read from an HTTP endpoint here too.
-    DATA_FILENAME = Path(__file__).parent/'data/gdp_data.csv'
-    raw_gdp_df = pd.read_csv(DATA_FILENAME)
+# Introdução
+st.markdown("""
+## **Introdução**
+Neste projeto, exploramos um conjunto de dados da NBA para entender como a performance dos jogadores evolui ao longo do tempo e como diferentes fatores influenciam suas carreiras. A aplicação permite explorar os dados, visualizar tendências e aplicar modelos de regressão linear para fazer previsões.
+""")
 
-    MIN_YEAR = 1960
-    MAX_YEAR = 2022
+# Seção para carregar os dados
+st.header("Carregamento de Dados")
+url = "https://raw.githubusercontent.com/caio-santt/datascience-course---NBA-database/main/all_seasons.csv"
+st.markdown("### Base de dados")
+st.write("Os dados serão carregados a partir da URL fornecida.")
 
-    # The data above has columns like:
-    # - Country Name
-    # - Country Code
-    # - [Stuff I don't care about]
-    # - GDP for 1960
-    # - GDP for 1961
-    # - GDP for 1962
-    # - ...
-    # - GDP for 2022
-    #
-    # ...but I want this instead:
-    # - Country Name
-    # - Country Code
-    # - Year
-    # - GDP
-    #
-    # So let's pivot all those year-columns into two: Year and GDP
-    gdp_df = raw_gdp_df.melt(
-        ['Country Code'],
-        [str(x) for x in range(MIN_YEAR, MAX_YEAR + 1)],
-        'Year',
-        'GDP',
-    )
+# Carregando os dados
+data = load_data(url)
+st.write("Dados carregados com sucesso! Aqui estão as 5 primeiras linhas do dataset:")
+st.dataframe(data.head())
 
-    # Convert years from string to integers
-    gdp_df['Year'] = pd.to_numeric(gdp_df['Year'])
+# Análise Exploratória de Dados (EDA)
+st.header("Análise Exploratória de Dados (EDA)")
 
-    return gdp_df
+# Exibir colunas do dataset
+st.write("Colunas disponíveis no dataset:", data.columns.tolist())
 
-gdp_df = get_gdp_data()
+# Selecionar colunas para análise
+selected_columns = st.multiselect("Selecione as colunas para análise:", data.columns.tolist())
+if selected_columns:
+    st.write("Resumo estatístico das colunas selecionadas:")
+    st.write(data[selected_columns].describe())
 
-# -----------------------------------------------------------------------------
-# Draw the actual page
+    st.write("Boxplots das colunas selecionadas:")
+    fig, ax = plt.subplots()
+    sns.boxplot(data=data[selected_columns], ax=ax)
+    st.pyplot(fig)
 
-# Set the title that appears at the top of the page.
-'''
-# :earth_americas: GDP dashboard
+    st.write("Histogramas das colunas selecionadas:")
+    fig, ax = plt.subplots()
+    data[selected_columns].hist(ax=ax, bins=30)
+    st.pyplot(fig)
 
-Browse GDP data from the [World Bank Open Data](https://data.worldbank.org/) website. As you'll
-notice, the data only goes to 2022 right now, and datapoints for certain years are often missing.
-But it's otherwise a great (and did I mention _free_?) source of data.
-'''
+# Modelagem de Regressão Linear
+st.header("Modelagem de Regressão Linear")
 
-# Add some spacing
-''
-''
+# Seleção de Variáveis
+x_var = st.selectbox("Selecione a variável independente (X):", data.columns.tolist())
+y_var = st.selectbox("Selecione a variável dependente (Y):", data.columns.tolist())
 
-min_value = gdp_df['Year'].min()
-max_value = gdp_df['Year'].max()
+if x_var and y_var:
+    X = data[[x_var]]
+    Y = data[y_var]
 
-from_year, to_year = st.slider(
-    'Which years are you interested in?',
-    min_value=min_value,
-    max_value=max_value,
-    value=[min_value, max_value])
+    # Divisão dos dados
+    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
 
-countries = gdp_df['Country Code'].unique()
+    # Modelo de Regressão
+    model = LinearRegression()
+    model.fit(X_train, Y_train)
+    Y_pred = model.predict(X_test)
 
-if not len(countries):
-    st.warning("Select at least one country")
+    # Resultados
+    st.write(f"Coeficiente de Regressão: {model.coef_[0]}")
+    st.write(f"Intercepto: {model.intercept_}")
+    st.write(f"R²: {r2_score(Y_test, Y_pred)}")
+    st.write(f"MSE: {mean_squared_error(Y_test, Y_pred)}")
 
-selected_countries = st.multiselect(
-    'Which countries would you like to view?',
-    countries,
-    ['DEU', 'FRA', 'GBR', 'BRA', 'MEX', 'JPN'])
+    # Visualização da Regressão
+    fig, ax = plt.subplots()
+    ax.scatter(X_test, Y_test, color='blue', label='Dados Reais')
+    ax.plot(X_test, Y_pred, color='red', label='Regressão Linear')
+    ax.set_xlabel(x_var)
+    ax.set_ylabel(y_var)
+    ax.legend()
+    st.pyplot(fig)
 
-''
-''
-''
+# Tendências de Peso, Altura, Idade e Diversidade
+st.header("Tendências ao Longo do Tempo")
 
-# Filter the data
-filtered_gdp_df = gdp_df[
-    (gdp_df['Country Code'].isin(selected_countries))
-    & (gdp_df['Year'] <= to_year)
-    & (from_year <= gdp_df['Year'])
-]
+# Seleção de Variável de Interesse
+trend_var = st.selectbox("Selecione a variável para análise de tendência:", ['height', 'weight', 'age', 'nationality'])
 
-st.header('GDP over time', divider='gray')
+if trend_var:
+    if trend_var != 'nationality':
+        # Análise de Tendência
+        st.write(f"Analisando a tendência de {trend_var} ao longo do tempo.")
+        trend_data = data.groupby('season_start')[trend_var].mean()
 
-''
+        # Gráfico de Tendência
+        fig, ax = plt.subplots()
+        ax.plot(trend_data.index, trend_data.values, marker='o', linestyle='-', color='green')
+        ax.set_title(f"Tendência de {trend_var} ao longo do tempo")
+        ax.set_xlabel("Temporada")
+        ax.set_ylabel(trend_var.capitalize())
+        st.pyplot(fig)
+    else:
+        # Diversidade Geográfica
+        st.write("Analisando a diversidade geográfica ao longo do tempo.")
+        data['nationality_grouped'] = data['nationality'].apply(lambda x: 'Americano' if x == 'USA' else 'Não-Americano')
+        diversity_data = data.groupby('season_start')['nationality_grouped'].value_counts(normalize=True).unstack()
 
-st.line_chart(
-    filtered_gdp_df,
-    x='Year',
-    y='GDP',
-    color='Country Code',
-)
-
-''
-''
-
-
-first_year = gdp_df[gdp_df['Year'] == from_year]
-last_year = gdp_df[gdp_df['Year'] == to_year]
-
-st.header(f'GDP in {to_year}', divider='gray')
-
-''
-
-cols = st.columns(4)
-
-for i, country in enumerate(selected_countries):
-    col = cols[i % len(cols)]
-
-    with col:
-        first_gdp = first_year[first_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-        last_gdp = last_year[last_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-
-        if math.isnan(first_gdp):
-            growth = 'n/a'
-            delta_color = 'off'
-        else:
-            growth = f'{last_gdp / first_gdp:,.2f}x'
-            delta_color = 'normal'
-
-        st.metric(
-            label=f'{country} GDP',
-            value=f'{last_gdp:,.0f}B',
-            delta=growth,
-            delta_color=delta_color
-        )
+        # Gráfico de Diversidade
+        fig, ax = plt.subplots()
+        diversity_data.plot(kind='bar', stacked=True, ax=ax, colormap='viridis')
+        ax.set_title("Diversidade Geográfica ao Longo do Tempo")
+        ax.set_xlabel("Temporada")
+        ax.set_ylabel("Proporção")
+        st.pyplot(fig)
