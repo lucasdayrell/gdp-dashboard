@@ -1,15 +1,31 @@
-import streamlit as st
-import pandas as pd
-import math
 from pathlib import Path
-
 import streamlit as st
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import r2_score, mean_squared_error
+import sys
+import subprocess
+
+# Função para instalar pacotes
+def install_packages():
+    packages = ['pandas', 'matplotlib', 'seaborn', 'scikit-learn']
+    for package in packages:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
+# Tentando importar pacotes, se falhar, instalar e importar novamente
+try:
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    from sklearn.linear_model import LinearRegression
+    from sklearn.model_selection import train_test_split
+    from sklearn.metrics import r2_score, mean_squared_error
+except ImportError:
+    st.warning("Algumas bibliotecas não estão instaladas. Instalando...")
+    install_packages()
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    from sklearn.linear_model import LinearRegression
+    from sklearn.model_selection import train_test_split
+    from sklearn.metrics import r2_score, mean_squared_error
 
 # Configuração inicial da aplicação
 st.set_page_config(page_title="NBA Data Analysis", layout="wide")
